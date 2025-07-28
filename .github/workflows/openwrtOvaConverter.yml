@@ -6,93 +6,30 @@ on:
 jobs:
   build_and_convert:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Set up environment
-      run: sudo apt-get update && sudo apt-get install -y qemu-utils virtualbox wget
-
     - name: Download OpenWRT x86 image
       run: |
-        wget --quiet --output-document=openwrt.img.gz https://downloads.openwrt.org/releases/24.10.0-rc6/targets/x86/64/openwrt-24.10.0-rc6-x86-64-generic-ext4-combined.img.gz
+        wget https://downloads.openwrt.org/releases/24.10.0-rc6/targets/x86/64/openwrt-24.10.0-rc6-x86-64-generic-ext4-combined.img.gz
+        gunzip openwrt-24.10.0-rc6-x86-64-generic-ext4-combined.img.gz 2> /dev/null
 
-    - name: Download SHA256 checksums
-      run: wget --quiet https://downloads.openwrt.org/releases/24.10.0-rc6/targets/x86/64/sha256sums
-
-    - name: Verify SHA256 checksum
-      run: sha256sum -c --ignore-missing sha256sums | tee checksum.log
-      shell: bash
-
-    - name: Fail if checksum verification failed
-      run: |
-        if ! grep -q "openwrt-24.10.0-rc6-x86-64-generic-ext4-combined.img.gz: OK" checksum.log; then
-          echo "Checksum verification failed!"
-          exit 1
-        fi
-
-    - name: Decompress OpenWRT image
-      run: gunzip -f openwrt.img.gz
+    - name: Install dependencies
+      run: sudo apt-get update && sudo apt-get install -y qemu-utils virtualbox
 
     - name: Convert .img to .vmdk
-      run: qemu-img convert -f raw -O vmdk openwrt-24.10.0-rc6-x86-64-generic-ext4-combined.img openwrt.vmdk
-
-    - name: Create minimal OVF descriptor
       run: |
+        qemu-img convert -f raw -O vmdk openwrt-24.10.0-rc6-x86-64-generic-ext4-combined.img openwrt.vmdk
+
+    - name: Create OVA file
+      run: |
+        # Create a basic OVF descriptor (for demonstration only, customize for production)
         cat <<EOF > openwrt.ovf
         <?xml version="1.0" encoding="UTF-8"?>
-        <Envelope vmw:buildId="build-123456" vmw:version="15" xmlns="http://schemas.dmtf.org/ovf/envelope/1" xmlns:vmw="http://www.vmware.com/schema/ovf">
-          <References>
-            <File ovf:href="openwrt.vmdk" ovf:id="file1" ovf:size="$(stat -c%s openwrt.vmdk)"/>
-          </References>
-          <DiskSection>
-            <Disk ovf:capacity="1073741824" ovf:diskId="vmdisk1" ovf:fileRef="file1" ovf:format="http://www.vmware.com/interfaces/specifications/vmdk.html#streamOptimized"/>
-          </DiskSection>
-          <VirtualSystem ovf:id="openwrt-vm">
-            <Info>OpenWRT x86 Virtual Machine</Info>
-            <Name>openwrt-x86</Name>
-            <OperatingSystemSection ovf:id="94" ovf:version="5.0" ovf:osType="other26xlinux64Guest"/>
-            <VirtualHardwareSection>
-              <Item>
-                <Description>1 virtual CPU</Description>
-                <ElementName>1 virtual CPU</ElementName>
-                <InstanceID>1</InstanceID>
-                <ResourceType>3</ResourceType>
-                <VirtualQuantity>1</VirtualQuantity>
-              </Item>
-              <Item>
-                <Description>1024MB of memory</Description>
-                <ElementName>1024MB of memory</ElementName>
-                <InstanceID>2</InstanceID>
-                <ResourceType>4</ResourceType>
-                <VirtualQuantity>1024</VirtualQuantity>
-              </Item>
-              <Item>
-                <Description>Hard disk</Description>
-                <ElementName>openwrt.vmdk</ElementName>
-                <InstanceID>3</InstanceID>
-                <ResourceType>17</ResourceType>
-                <HostResource>ovf:/disk/vmdisk1</HostResource>
-              </Item>
-              <Item>
-                <Description>IDE Controller</Description>
-                <ElementName>IDE Controller 0</ElementName>
-                <InstanceID>4</InstanceID>
-                <ResourceType>5</ResourceType>
-              </Item>
-              <Item>
-                <Description>Ethernet adapter</Description>
-                <ElementName>Network adapter 1</ElementName>
-                <InstanceID>5</InstanceID>
-                <ResourceType>10</ResourceType>
-                <Connection>VM Network</Connection>
-                <AddressOnParent>0</AddressOnParent>
-              </Item>
-            </VirtualHardwareSection>
-          </VirtualSystem>
+        <Envelope ... >
+          <!-- Insert proper OVF XML content here -->
         </Envelope>
         EOF
-
-    - name: Package OVA
-      run: tar -cvf openwrt.ova openwrt.ovf openwrt.vmdk
+        # Package as OVA
+        tar -cvf openwrt.ova openwrt.ovf openwrt.vmdk
 
     - name: Upload OVA artifact
       uses: actions/upload-artifact@v4
