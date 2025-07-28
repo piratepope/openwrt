@@ -1,0 +1,38 @@
+name: Build and Convert OpenWRT x86 Image to OVA
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build_and_convert:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Download OpenWRT x86 image
+      run: |
+        wget https://downloads.openwrt.org/releases/24.10.0-rc6/targets/x86/64/openwrt-24.10.0-rc6-x86-64-generic-ext4-combined.img.gz
+        gunzip openwrt-24.10.0-rc6-x86-64-generic-ext4-combined.img.gz
+
+    - name: Install dependencies
+      run: sudo apt-get update && sudo apt-get install -y qemu-utils virtualbox
+
+    - name: Convert .img to .vmdk
+      run: |
+        qemu-img convert -f raw -O vmdk openwrt-24.10.0-rc6-x86-64-generic-ext4-combined.img openwrt.vmdk
+
+    - name: Create OVA file
+      run: |
+        # Create a basic OVF descriptor (for demonstration only, customize for production)
+        cat <<EOF > openwrt.ovf
+        <?xml version="1.0" encoding="UTF-8"?>
+        <Envelope ... >
+          <!-- Insert proper OVF XML content here -->
+        </Envelope>
+        EOF
+        # Package as OVA
+        tar -cvf openwrt.ova openwrt.ovf openwrt.vmdk
+
+    - name: Upload OVA artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: openwrt-ova
+        path: openwrt.ova
